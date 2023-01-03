@@ -7,8 +7,11 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8.5"
-fhe = {git="https://github.com/Janmajayamall/fhe.rs", branch="wasm"}
+fhe = {path="./../fhe.rs/crates/fhe"}
 fhe-math = {git="https://github.com/Janmajayamall/fhe.rs", branch="wasm"}
+fhe-util = {git="https://github.com/Janmajayamall/fhe.rs", branch="wasm"}
+fhe-traits = {path="./../fhe.rs/crates/fhe-traits"}
+omr = {path="./../omr"}
 num-bigint = "0.4.3"
 num-traits = "0.2.15"
 wasm-bindgen = "0.2.63"
