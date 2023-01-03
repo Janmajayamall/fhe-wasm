@@ -21,7 +21,7 @@ wasm-bindgen = "0.2.63"
 [patch.crates-io]
 fhe = { git =  "https://github.com/Janmajayamall/fhe.rs.git", branch = "wasm" }
 fhe-util = { git =  "https://github.com/Janmajayamall/fhe.rs.git", branch = "simd" }
-fhe-traits = { git =  "https://github.com/Janmajayamall/fhe.rs.git", branch = "simd" }
+fhe-traits = { git =  "https://github.com/Janmajayamall/fhe.rs.git", branch = "wasm" }
 fhe-math = { git =  "https://github.com/Janmajayamall/fhe.rs.git", branch = "wasm" }
 
 
