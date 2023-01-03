@@ -6,10 +6,14 @@ use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use omr::{
     client::{construct_lhs, construct_rhs, pv_decompress},
-    utils::{assign_buckets, solve_equations},
-    GAMMA, K, M, MODULI_OMR_PT, M_ROW_SPAN, SET_SIZE,
+    utils::{
+        assign_buckets, deserialize_detection_key, gen_detection_key, serialize_detection_key,
+        solve_equations,
+    },
+    DEGREE, GAMMA, K, M, MODULI_OMR, MODULI_OMR_PT, M_ROW_SPAN, SET_SIZE, VARIANCE,
 };
-use rand::{thread_rng, RngCore};
+use rand::{thread_rng, RngCore, SeedableRng};
+use rand_chacha::ChaChaRng;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
@@ -17,43 +21,16 @@ use wasm_bindgen::prelude::*;
 extern "C" {
     fn alert(s: &str);
 }
-// Generate bindings for
-// 1. New Secert key
-// 2. Evaluation keys and Relinearisation keys
-// 3. Fn that concats (2) and stores it for the user.
-// 4. PVWWWW
 
-const N: usize = 2048;
-const VARIANCE: usize = 4;
-const MODULI: [u64; 15] = [
-    268369921,
-    549755486209,
-    1152921504606584833,
-    1152921504598720513,
-    1152921504597016577,
-    1152921504595968001,
-    1152921504595640321,
-    1152921504593412097,
-    1152921504592822273,
-    1152921504592429057,
-    1152921504589938689,
-    1152921504586530817,
-    4293918721,
-    1073479681,
-    1152921504585547777,
-];
-const T: u64 = 65537;
-const CT_SPAN_COUNT: usize = 7;
 const CT_BYTES: usize = 0;
 
 fn get_params() -> Arc<BfvParameters> {
     // instantiate bfv params
     Arc::new(
         BfvParametersBuilder::new()
-            .set_degree(N)
-            .set_moduli(&MODULI)
-            .set_plaintext_modulus(T)
-            .set_variance(VARIANCE)
+            .set_degree(DEGREE)
+            .set_moduli(MODULI_OMR)
+            .set_plaintext_modulus(MODULI_OMR_PT[0])
             .build()
             .unwrap(),
     )
@@ -63,7 +40,7 @@ fn get_params() -> Arc<BfvParameters> {
 pub fn generate_secret() -> Box<[i64]> {
     let mut rng = thread_rng();
 
-    sample_vec_cbd(N, VARIANCE, &mut rng)
+    sample_vec_cbd(DEGREE, VARIANCE, &mut rng)
         .unwrap()
         .into_boxed_slice()
 }
@@ -72,32 +49,19 @@ pub fn generate_secret() -> Box<[i64]> {
 pub fn generate_detection_key(sk: Box<[i64]>) -> Box<[u8]> {
     let mut rng = thread_rng();
 
-    // instantiate bfv params
-    let par = Arc::new(
-        BfvParametersBuilder::new()
-            .set_degree(N)
-            .set_moduli(&MODULI)
-            .set_plaintext_modulus(T)
-            .set_variance(VARIANCE)
-            .build()
-            .unwrap(),
-    );
-    let sk = SecretKey::new(sk.to_vec(), &par);
-
-    // let g = GaloisKey::new(&sk, 3, 0, 0, &mut rng).unwrap();
-    // let g = g.to_bytes();
-    todo!()
-}
-
-#[wasm_bindgen]
-pub fn decrypt_digest(sk: Box<[i64]>, digest: Vec<u8>) {
-    // seed the rng
-    let mut rng = thread_rng();
-
     let par = get_params();
     let sk = SecretKey::new(sk.to_vec(), &par);
 
-    // digest -> ciphertexts
+    let key = gen_detection_key(&par, &sk, &mut rng);
+    let s_key = serialize_detection_key(&key);
+    s_key.into_boxed_slice()
+}
+
+#[wasm_bindgen]
+pub fn decrypt_digest(sk: Box<[i64]>, digest: Vec<u8>, seed: Vec<u8>) -> Vec<u64> {
+    let par = get_params();
+    let sk = SecretKey::new(sk.to_vec(), &par);
+
     let values = digest
         .chunks(CT_BYTES)
         .into_iter()
@@ -113,7 +77,12 @@ pub fn decrypt_digest(sk: Box<[i64]>, digest: Vec<u8>) {
         (64 - (par.plaintext().leading_zeros() - 1)) as usize,
     );
 
-    assign_buckets(M, GAMMA, MODULI_OMR_PT[0], SET_SIZE);
+    // seed the rng
+    let mut s: <ChaChaRng as SeedableRng>::Seed = Default::default();
+    s.copy_from_slice(&seed);
+    let mut rng = ChaChaRng::from_seed(s);
+    let (assigned_buckets, assigned_weights) =
+        assign_buckets(M, GAMMA, MODULI_OMR_PT[0], SET_SIZE, &mut rng);
 
     let lhs = construct_lhs(
         &pv,
@@ -125,7 +94,10 @@ pub fn decrypt_digest(sk: Box<[i64]>, digest: Vec<u8>) {
         SET_SIZE,
     );
     let rhs = construct_rhs(&values[par.degree()..], M, M_ROW_SPAN, MODULI_OMR_PT[0]);
-    let msgs = solve_equations(lhs, rhs, MODULI_OMR_PT[0]);
+    solve_equations(lhs, rhs, MODULI_OMR_PT[0])
+        .into_iter()
+        .flatten()
+        .collect()
 }
 
 #[wasm_bindgen]
@@ -189,3 +161,6 @@ pub fn test_scalar_32() {
         alert("Failed!");
     }
 }
+
+#[cfg(test)]
+mod tests {}

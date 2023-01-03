@@ -7,14 +7,23 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8.5"
-fhe = {path="./../fhe.rs/crates/fhe"}
-fhe-math = {git="https://github.com/Janmajayamall/fhe.rs", branch="wasm"}
-fhe-util = {git="https://github.com/Janmajayamall/fhe.rs", branch="wasm"}
-fhe-traits = {path="./../fhe.rs/crates/fhe-traits"}
+rand_chacha = "0.3.1"
+fhe = "0.1.0-beta.4"
+fhe-util = "0.1.0-beta.4"
+fhe-traits = "0.1.0-beta.4"
+fhe-math = "0.1.0-beta.4"
 omr = {path="./../omr"}
 num-bigint = "0.4.3"
 num-traits = "0.2.15"
 wasm-bindgen = "0.2.63"
+
+
+[patch.crates-io]
+fhe = { git =  "https://github.com/Janmajayamall/fhe.rs.git", branch = "wasm" }
+fhe-util = { git =  "https://github.com/Janmajayamall/fhe.rs.git", branch = "simd" }
+fhe-traits = { git =  "https://github.com/Janmajayamall/fhe.rs.git", branch = "simd" }
+fhe-math = { git =  "https://github.com/Janmajayamall/fhe.rs.git", branch = "wasm" }
+
 
 [lib]
 crate-type = ["cdylib"]

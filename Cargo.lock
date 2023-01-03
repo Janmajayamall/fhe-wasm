@@ -150,10 +150,11 @@ checksum = "90e5c1c8368803113bf0c9584fc495a58b86dc8a29edbf8fe877d21d9507e797"
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.4"
+source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=wasm#66c6ffe87163447805568713a914fab2aa452c4c"
 dependencies = [
- "fhe-math 0.1.0-beta.4",
- "fhe-traits 0.1.0-beta.4",
- "fhe-util 0.1.0-beta.4",
+ "fhe-math",
+ "fhe-traits 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs.git?branch=wasm)",
+ "fhe-util 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs.git?branch=wasm)",
  "getrandom",
  "itertools",
  "ndarray",
@@ -168,77 +169,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "fhe"
-version = "0.1.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43272134651fe0c1263f99f5e71392f92b82aadf45299ea407af23cf0562e338"
-dependencies = [
- "fhe-math 0.1.0-beta.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "fhe-traits 0.1.0-beta.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "fhe-util 0.1.0-beta.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "itertools",
- "ndarray",
- "num-bigint",
- "num-traits",
- "protobuf",
- "rand",
- "rand_chacha",
- "thiserror",
- "zeroize",
- "zeroize_derive",
-]
-
-[[package]]
 name = "fhe-math"
 version = "0.1.0-beta.4"
+source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=wasm#66c6ffe87163447805568713a914fab2aa452c4c"
 dependencies = [
  "crypto-bigint",
- "fhe-traits 0.1.0-beta.4",
- "fhe-util 0.1.0-beta.4",
- "getrandom",
- "itertools",
- "ndarray",
- "num-bigint",
- "num-bigint-dig",
- "num-traits",
- "protobuf",
- "rand",
- "rand_chacha",
- "sha2",
- "thiserror",
- "zeroize",
-]
-
-[[package]]
-name = "fhe-math"
-version = "0.1.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "246019bd16a52e4f3753908191e4e183877e9edfd8126d25782bf877cf92910f"
-dependencies = [
- "crypto-bigint",
- "fhe-traits 0.1.0-beta.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "fhe-util 0.1.0-beta.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "itertools",
- "ndarray",
- "num-bigint",
- "num-bigint-dig",
- "num-traits",
- "protobuf",
- "rand",
- "rand_chacha",
- "sha2",
- "thiserror",
- "zeroize",
-]
-
-[[package]]
-name = "fhe-math"
-version = "0.1.0-beta.4"
-source = "git+https://github.com/Janmajayamall/fhe.rs?branch=wasm#8ce03516125879cef6e299b9df7c8f6bee3d86ed"
-dependencies = [
- "crypto-bigint",
- "fhe-traits 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs?branch=wasm)",
- "fhe-util 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs?branch=wasm)",
+ "fhe-traits 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs.git?branch=wasm)",
+ "fhe-util 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs.git?branch=wasm)",
  "getrandom",
  "itertools",
  "ndarray",
@@ -256,6 +193,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.4"
+source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd#9908ce7198a1ed699559d14de5413df76fc743ca"
 dependencies = [
  "rand",
 ]
@@ -263,16 +201,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c9f2c75f3604f35c499e7c2885e4c3476e35c538880e33221869cad7bad745e"
-dependencies = [
- "rand",
-]
-
-[[package]]
-name = "fhe-traits"
-version = "0.1.0-beta.4"
-source = "git+https://github.com/Janmajayamall/fhe.rs?branch=wasm#8ce03516125879cef6e299b9df7c8f6bee3d86ed"
+source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=wasm#66c6ffe87163447805568713a914fab2aa452c4c"
 dependencies = [
  "rand",
 ]
@@ -280,6 +209,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.4"
+source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd#9908ce7198a1ed699559d14de5413df76fc743ca"
 dependencies = [
  "itertools",
  "num-bigint-dig",
@@ -290,19 +220,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8a196a83c206432425b755950fd6ef1e2e5b81d7995869f68764403320e03a1"
-dependencies = [
- "itertools",
- "num-bigint-dig",
- "num-traits",
- "rand",
-]
-
-[[package]]
-name = "fhe-util"
-version = "0.1.0-beta.4"
-source = "git+https://github.com/Janmajayamall/fhe.rs?branch=wasm#8ce03516125879cef6e299b9df7c8f6bee3d86ed"
+source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=wasm#66c6ffe87163447805568713a914fab2aa452c4c"
 dependencies = [
  "itertools",
  "num-bigint-dig",
@@ -314,14 +232,15 @@ dependencies = [
 name = "fhe-wasm"
 version = "0.1.0"
 dependencies = [
- "fhe 0.1.0-beta.4",
- "fhe-math 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs?branch=wasm)",
- "fhe-traits 0.1.0-beta.4",
- "fhe-util 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs?branch=wasm)",
+ "fhe",
+ "fhe-math",
+ "fhe-traits 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd)",
+ "fhe-util 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd)",
  "num-bigint",
  "num-traits",
  "omr",
  "rand",
+ "rand_chacha",
  "wasm-bindgen",
 ]
 
@@ -560,14 +479,15 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "byteorder",
- "fhe 0.1.0-beta.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "fhe-math 0.1.0-beta.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "fhe-traits 0.1.0-beta.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "fhe-util 0.1.0-beta.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fhe",
+ "fhe-math",
+ "fhe-traits 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd)",
+ "fhe-util 0.1.0-beta.4 (git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd)",
  "itertools",
  "ndarray",
  "protobuf",
  "rand",
+ "rand_chacha",
  "rayon",
  "serde",
  "statrs",
