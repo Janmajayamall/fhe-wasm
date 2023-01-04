@@ -6,6 +6,7 @@ use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use omr::{
     client::{construct_lhs, construct_rhs, pv_decompress},
+    pvw::{PvwCiphertext, PvwParameters, PvwPublicKey, PvwSecretKey},
     utils::{
         assign_buckets, deserialize_detection_key, gen_detection_key, serialize_detection_key,
         solve_equations,
@@ -24,7 +25,7 @@ extern "C" {
 
 const CT_BYTES: usize = 0;
 
-fn get_params() -> Arc<BfvParameters> {
+fn get_bfv_params() -> Arc<BfvParameters> {
     // instantiate bfv params
     Arc::new(
         BfvParametersBuilder::new()
@@ -36,20 +37,49 @@ fn get_params() -> Arc<BfvParameters> {
     )
 }
 
-#[wasm_bindgen]
-pub fn generate_secret() -> Box<[i64]> {
-    let mut rng = thread_rng();
+fn get_pvw_params() -> Arc<PvwParameters> {
+    Arc::new(PvwParameters::default())
+}
 
+#[wasm_bindgen]
+pub fn generate_bfv_secret() -> Box<[i64]> {
+    let mut rng = thread_rng();
     sample_vec_cbd(DEGREE, VARIANCE, &mut rng)
         .unwrap()
         .into_boxed_slice()
 }
 
 #[wasm_bindgen]
+pub fn generate_pvw_secret() -> Vec<u8> {
+    let mut rng = thread_rng();
+    let par = get_pvw_params();
+    let sk = PvwSecretKey::random(&par, &mut rng);
+    sk.to_bytes()
+}
+
+#[wasm_bindgen]
+pub fn create_pvw_public_key(serialised_sk: &[u8]) -> Vec<u8> {
+    let mut rng = thread_rng();
+    let par = get_pvw_params();
+    let sk = PvwSecretKey::from_bytes(serialised_sk, &par);
+    let pk = sk.public_key(&mut rng);
+    pk.to_bytes()
+}
+
+#[wasm_bindgen]
+pub fn gen_clue(serialised_pk: &[u8]) -> Vec<u8> {
+    let mut rng = thread_rng();
+    let par = get_pvw_params();
+    let pk = PvwPublicKey::from_bytes(serialised_pk, &par);
+    let ct = pk.encrypt(vec![0; par.ell].as_slice(), &mut rng);
+    ct.to_bytes()
+}
+
+#[wasm_bindgen]
 pub fn generate_detection_key(sk: Box<[i64]>) -> Box<[u8]> {
     let mut rng = thread_rng();
 
-    let par = get_params();
+    let par = get_bfv_params();
     let sk = SecretKey::new(sk.to_vec(), &par);
 
     let key = gen_detection_key(&par, &sk, &mut rng);
@@ -59,7 +89,7 @@ pub fn generate_detection_key(sk: Box<[i64]>) -> Box<[u8]> {
 
 #[wasm_bindgen]
 pub fn decrypt_digest(sk: Box<[i64]>, digest: Vec<u8>, seed: Vec<u8>) -> Vec<u64> {
-    let par = get_params();
+    let par = get_bfv_params();
     let sk = SecretKey::new(sk.to_vec(), &par);
 
     let values = digest
@@ -102,10 +132,6 @@ pub fn decrypt_digest(sk: Box<[i64]>, digest: Vec<u8>, seed: Vec<u8>) -> Vec<u64
 
 #[wasm_bindgen]
 pub fn test_scalar_32() {
-    // let mut rng = thread_rng();
-    // let par = BfvParameters::default_parameters_128(11)[0].clone();
-    // let sk = SecretKey::random(&par, &mut rng);
-
     // Testing Scalar for wasm32
     let n = BigUint::from(4611686018326724610u64);
     let d = BigUint::from(1000u64);
