@@ -76,13 +76,16 @@ pub fn gen_clue(serialised_pk: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
-pub fn generate_detection_key(sk: Box<[i64]>) -> Box<[u8]> {
+pub fn generate_detection_key(bfv_sk_i64: Box<[i64]>, pvw_sk_bytes: &[u8]) -> Box<[u8]> {
     let mut rng = thread_rng();
 
-    let par = get_bfv_params();
-    let sk = SecretKey::new(sk.to_vec(), &par);
+    let bfv_par = get_bfv_params();
+    let bfv_sk = SecretKey::new(bfv_sk_i64.to_vec(), &bfv_par);
 
-    let key = gen_detection_key(&par, &sk, &mut rng);
+    let pvw_par = get_pvw_params();
+    let pvw_sk = PvwSecretKey::from_bytes(pvw_sk_bytes, &pvw_par);
+
+    let key = gen_detection_key(&bfv_par, &pvw_par, &bfv_sk, &pvw_sk, &mut rng);
     let s_key = serialize_detection_key(&key);
     s_key.into_boxed_slice()
 }
