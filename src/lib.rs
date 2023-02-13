@@ -63,7 +63,7 @@ pub fn generate_pvw_secret() -> Vec<u8> {
 }
 
 #[wasm_bindgen]
-pub fn create_pvw_public_key(serialised_sk: &[u8]) -> Vec<u8> {
+pub fn generate_pvw_public_key(serialised_sk: &[u8]) -> Vec<u8> {
     let mut rng = thread_rng();
     let par = get_pvw_params();
     let sk = PvwSecretKey::from_bytes(serialised_sk, &par);
