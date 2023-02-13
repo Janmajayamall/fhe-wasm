@@ -25,6 +25,11 @@ extern "C" {
 
 const CT_BYTES: usize = 0;
 
+#[wasm_bindgen]
+pub fn init_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+
 fn get_bfv_params() -> Arc<BfvParameters> {
     // instantiate bfv params
     Arc::new(
@@ -192,4 +197,23 @@ pub fn test_scalar_32() {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use crate::gen_clue;
+    use omr::pvw::{PvwParameters, PvwSecretKey};
+    use rand::thread_rng;
+
+    #[test]
+    fn test_gen_clue() {
+        let params = Arc::new(PvwParameters::default());
+        let mut rng = thread_rng();
+        let sk = PvwSecretKey::random(&params, &mut rng);
+        let pk = sk.public_key(&mut rng);
+
+        let pk_bytes = pk.to_bytes();
+        let clue = gen_clue(&pk_bytes);
+        let ct = PvwCiphertext::from_bytes(&clue, &params).unwrap();
+        let pt = sk.decrypt_shifted(ct);
+        assert_eq!(pt, vec![0, 0, 0, 0]);
+    }
+}
