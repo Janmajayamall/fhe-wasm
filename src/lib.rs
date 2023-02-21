@@ -1,21 +1,31 @@
-use fhe::bfv::{BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, GaloisKey, SecretKey};
-use fhe_math::rns::{RnsContext, RnsScaler, ScalingFactor};
-use fhe_traits::{DeserializeParametrized, FheDecoder, FheDecrypter, FheEncrypter, Serialize};
+use fhe::bfv::{
+    BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, EvaluationKey, EvaluationKeyBuilder,
+    GaloisKey, Plaintext, SecretKey,
+};
+use fhe_math::{
+    rns::{RnsContext, RnsScaler, ScalingFactor},
+    rq::Context,
+    zq::{ntt::NttOperator, Modulus},
+};
+use fhe_traits::{
+    DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter, Serialize,
+};
 use fhe_util::sample_vec_cbd;
 use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use omr::{
-    client::{construct_lhs, construct_rhs, pv_decompress},
+    client::{construct_lhs, construct_rhs, gen_pvw_sk_cts, pv_decompress},
     pvw::{PvwCiphertext, PvwParameters, PvwPublicKey, PvwSecretKey},
     utils::{
-        assign_buckets, deserialize_detection_key, gen_detection_key, serialize_detection_key,
+        assign_buckets, deserialize_detection_key, gen_detection_key, gen_rlk_keys_levelled,
+        gen_rot_keys_inner_product, gen_rot_keys_pv_selector, serialize_detection_key,
         solve_equations,
     },
     DEGREE, GAMMA, K, M, MODULI_OMR, MODULI_OMR_PT, M_ROW_SPAN, SET_SIZE, VARIANCE,
 };
 use rand::{thread_rng, RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
-use std::sync::Arc;
+use std::{collections::HashMap, fmt::format, io::Write, sync::Arc};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -27,7 +37,7 @@ const CT_BYTES: usize = 0;
 
 #[wasm_bindgen]
 pub fn init_panic_hook() {
-    console_error_panic_hook::set_once();
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 }
 
 fn get_bfv_params() -> Arc<BfvParameters> {
@@ -37,6 +47,7 @@ fn get_bfv_params() -> Arc<BfvParameters> {
             .set_degree(DEGREE)
             .set_moduli(MODULI_OMR)
             .set_plaintext_modulus(MODULI_OMR_PT[0])
+            .set_variance(VARIANCE)
             .build()
             .unwrap(),
     )
@@ -80,8 +91,27 @@ pub fn gen_clue(serialised_pk: &[u8]) -> Vec<u8> {
     ct.to_bytes()
 }
 
+// #[wasm_bindgen]
+// pub fn generate_detection_key(bfv_sk_i64: Box<[i64]>, pvw_sk_bytes: &[u8]) -> Vec<u8> {
+//     let mut rng = thread_rng();
+
+//     let bfv_par = get_bfv_params();
+//     let bfv_sk = SecretKey::new(bfv_sk_i64.to_vec(), &bfv_par);
+
+//     let pvw_par = get_pvw_params();
+//     let pvw_sk = PvwSecretKey::from_bytes(pvw_sk_bytes, &pvw_par);
+
+//     let key = gen_detection_key(&bfv_par, &pvw_par, &bfv_sk, &pvw_sk, &mut rng);
+//     let serialised_dkey = serialize_detection_key(&key);
+//     // let key2 = deserialize_detection_key(&bfv_par, &serialised_dkey);
+
+//     // assert_eq!(&key, &key2);
+
+//     serialised_dkey
+// }
+
 #[wasm_bindgen]
-pub fn generate_detection_key(bfv_sk_i64: Box<[i64]>, pvw_sk_bytes: &[u8]) -> Box<[u8]> {
+pub fn generate_detection_key_pvw_sk_cts(bfv_sk_i64: Box<[i64]>, pvw_sk_bytes: &[u8]) -> Vec<u8> {
     let mut rng = thread_rng();
 
     let bfv_par = get_bfv_params();
@@ -90,9 +120,57 @@ pub fn generate_detection_key(bfv_sk_i64: Box<[i64]>, pvw_sk_bytes: &[u8]) -> Bo
     let pvw_par = get_pvw_params();
     let pvw_sk = PvwSecretKey::from_bytes(pvw_sk_bytes, &pvw_par);
 
-    let key = gen_detection_key(&bfv_par, &pvw_par, &bfv_sk, &pvw_sk, &mut rng);
-    let s_key = serialize_detection_key(&key);
-    s_key.into_boxed_slice()
+    let cts = gen_pvw_sk_cts(&bfv_par, &pvw_par, &bfv_sk, &pvw_sk, &mut rng);
+    let serialised_dkey = cts.iter().flat_map(|c| c.to_bytes()).collect();
+
+    serialised_dkey
+}
+
+#[wasm_bindgen]
+pub fn generate_detection_key_eks(bfv_sk_i64: Box<[i64]>) -> Vec<u8> {
+    let mut rng = thread_rng();
+
+    let bfv_par = get_bfv_params();
+    let bfv_sk = SecretKey::new(bfv_sk_i64.to_vec(), &bfv_par);
+
+    let ek1 = EvaluationKeyBuilder::new_leveled(&bfv_sk, 0, 0)
+        .unwrap()
+        .enable_column_rotation(1)
+        .unwrap()
+        .build(&mut rng)
+        .unwrap();
+    let ek2 = gen_rot_keys_pv_selector(&bfv_par, &bfv_sk, 11, 10, &mut rng);
+    let ek3 = gen_rot_keys_inner_product(&bfv_par, &bfv_sk, 13, 12, &mut rng);
+
+    let mut serialised = vec![];
+    serialised.extend_from_slice(ek1.to_bytes().as_slice());
+    serialised.extend_from_slice(ek2.to_bytes().as_slice());
+    serialised.extend_from_slice(ek3.to_bytes().as_slice());
+
+    serialised
+}
+
+#[wasm_bindgen]
+pub fn generate_detection_key_rlks(bfv_sk_i64: Box<[i64]>) -> Vec<u8> {
+    let mut rng = thread_rng();
+
+    let bfv_par = get_bfv_params();
+    let bfv_sk = SecretKey::new(bfv_sk_i64.to_vec(), &bfv_par);
+
+    let rlk_keys = gen_rlk_keys_levelled(&bfv_par, &bfv_sk, &mut rng);
+
+    let mut serialised = vec![];
+    (1..12).into_iter().for_each(|index| {
+        serialised.extend_from_slice(
+            rlk_keys
+                .get(&index)
+                .unwrap_or_else(|| panic!("Rlk key for {index} should be generated"))
+                .to_bytes()
+                .as_slice(),
+        );
+    });
+
+    serialised
 }
 
 #[wasm_bindgen]
@@ -136,6 +214,11 @@ pub fn decrypt_digest(sk: Box<[i64]>, digest: Vec<u8>, seed: Vec<u8>) -> Vec<u64
         .into_iter()
         .flatten()
         .collect()
+}
+
+#[wasm_bindgen]
+pub fn serialise_sk_rs(sk: Box<[i64]>) -> Vec<u8> {
+    bincode::serialize(&sk).unwrap()
 }
 
 #[wasm_bindgen]
@@ -189,11 +272,7 @@ pub fn test_scalar_32() {
         (x_lift * n + (&d >> 1)) / d
     };
 
-    if (res == r.project(&x_scaled_round)) {
-        alert("Works!");
-    } else {
-        alert("Failed!");
-    }
+    assert!(res == r.project(&x_scaled_round));
 }
 
 #[cfg(test)]

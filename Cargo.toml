@@ -12,11 +12,13 @@ fhe = "0.1.0-beta.4"
 fhe-util = "0.1.0-beta.4"
 fhe-traits = "0.1.0-beta.4"
 fhe-math = "0.1.0-beta.4"
-omr = {git = "https://github.com/Janmajayamall/ObliviousMessageRetrieval.git", branch="main"}
+omr = {git = "https://github.com/Janmajayamall/ObliviousMessageRetrieval.git", branch  = "aztec"}
 num-bigint = "0.4.3"
 num-traits = "0.2.15"
 wasm-bindgen = "0.2.63"
 console_error_panic_hook = "0.1.7"
+bincode = "1.3.3"
+hex = "0.4.3"
 
 
 [patch.crates-io]
