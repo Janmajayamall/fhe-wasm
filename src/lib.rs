@@ -58,11 +58,10 @@ fn get_pvw_params() -> Arc<PvwParameters> {
 }
 
 #[wasm_bindgen]
-pub fn generate_bfv_secret() -> Box<[i64]> {
+pub fn generate_bfv_secret() -> Vec<u8> {
     let mut rng = thread_rng();
-    sample_vec_cbd(DEGREE, VARIANCE, &mut rng)
-        .unwrap()
-        .into_boxed_slice()
+    let sk = sample_vec_cbd(DEGREE, VARIANCE, &mut rng).unwrap();
+    bincode::serialize(&sk).unwrap()
 }
 
 #[wasm_bindgen]
@@ -111,11 +110,12 @@ pub fn gen_clue(serialised_pk: &[u8]) -> Vec<u8> {
 // }
 
 #[wasm_bindgen]
-pub fn generate_detection_key_pvw_sk_cts(bfv_sk_i64: Box<[i64]>, pvw_sk_bytes: &[u8]) -> Vec<u8> {
+pub fn generate_detection_key_pvw_sk_cts(bfv_sk: Vec<u8>, pvw_sk_bytes: &[u8]) -> Vec<u8> {
     let mut rng = thread_rng();
 
     let bfv_par = get_bfv_params();
-    let bfv_sk = SecretKey::new(bfv_sk_i64.to_vec(), &bfv_par);
+    let bfv_sk: Vec<i64> = bincode::deserialize(&bfv_sk).unwrap();
+    let bfv_sk = SecretKey::new(bfv_sk, &bfv_par);
 
     let pvw_par = get_pvw_params();
     let pvw_sk = PvwSecretKey::from_bytes(pvw_sk_bytes, &pvw_par);
@@ -127,11 +127,12 @@ pub fn generate_detection_key_pvw_sk_cts(bfv_sk_i64: Box<[i64]>, pvw_sk_bytes: &
 }
 
 #[wasm_bindgen]
-pub fn generate_detection_key_eks(bfv_sk_i64: Box<[i64]>) -> Vec<u8> {
+pub fn generate_detection_key_eks(bfv_sk: Vec<u8>) -> Vec<u8> {
     let mut rng = thread_rng();
 
     let bfv_par = get_bfv_params();
-    let bfv_sk = SecretKey::new(bfv_sk_i64.to_vec(), &bfv_par);
+    let bfv_sk: Vec<i64> = bincode::deserialize(&bfv_sk).unwrap();
+    let bfv_sk = SecretKey::new(bfv_sk, &bfv_par);
 
     let ek1 = EvaluationKeyBuilder::new_leveled(&bfv_sk, 0, 0)
         .unwrap()
@@ -151,11 +152,12 @@ pub fn generate_detection_key_eks(bfv_sk_i64: Box<[i64]>) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
-pub fn generate_detection_key_rlks(bfv_sk_i64: Box<[i64]>) -> Vec<u8> {
+pub fn generate_detection_key_rlks(bfv_sk: Vec<u8>) -> Vec<u8> {
     let mut rng = thread_rng();
 
     let bfv_par = get_bfv_params();
-    let bfv_sk = SecretKey::new(bfv_sk_i64.to_vec(), &bfv_par);
+    let bfv_sk: Vec<i64> = bincode::deserialize(&bfv_sk).unwrap();
+    let bfv_sk = SecretKey::new(bfv_sk, &bfv_par);
 
     let rlk_keys = gen_rlk_keys_levelled(&bfv_par, &bfv_sk, &mut rng);
 
@@ -174,9 +176,10 @@ pub fn generate_detection_key_rlks(bfv_sk_i64: Box<[i64]>) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
-pub fn decrypt_digest(sk: Box<[i64]>, digest: Vec<u8>, seed: Vec<u8>) -> Vec<u64> {
+pub fn decrypt_digest(sk: Vec<u8>, digest: Vec<u8>, seed: Vec<u8>) -> Vec<u64> {
     let par = get_bfv_params();
-    let sk = SecretKey::new(sk.to_vec(), &par);
+    let sk: Vec<i64> = bincode::deserialize(&sk).unwrap();
+    let sk = SecretKey::new(sk, &par);
 
     let values = digest
         .chunks(CT_BYTES)
