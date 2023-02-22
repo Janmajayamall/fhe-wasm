@@ -176,10 +176,35 @@ pub fn generate_detection_key_rlks(bfv_sk: Vec<u8>) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
-pub fn decrypt_digest(sk: Vec<u8>, digest: Vec<u8>, seed: Vec<u8>) -> Vec<u64> {
+pub fn decrypt_digest1(sk: Vec<u8>, digest: Vec<u8>) -> u64 {
     let par = get_bfv_params();
     let sk: Vec<i64> = bincode::deserialize(&sk).unwrap();
     let sk = SecretKey::new(sk, &par);
+
+    let values = digest
+        .chunks(CT_BYTES)
+        .into_iter()
+        .flat_map(|ct_bytes| {
+            let ct = Ciphertext::from_bytes(ct_bytes, &par).unwrap();
+            let pt = sk.try_decrypt(&ct).unwrap();
+            Vec::<u64>::try_decode(&pt, Encoding::simd()).unwrap()
+        })
+        .collect::<Vec<u64>>();
+
+    let pv = pv_decompress(
+        &values[..par.degree()],
+        (64 - (par.plaintext().leading_zeros() - 1)) as usize,
+    );
+
+    pv.iter().sum::<u64>()
+}
+
+#[wasm_bindgen]
+pub fn decrypt_digest2(sk: Vec<u8>, digest: Vec<u8>) -> Vec<u64> {
+    let par = get_bfv_params();
+    let sk: Vec<i64> = bincode::deserialize(&sk).unwrap();
+    let sk = SecretKey::new(sk, &par);
+    let seed = vec![0u8];
 
     let values = digest
         .chunks(CT_BYTES)

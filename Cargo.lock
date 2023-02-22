@@ -281,7 +281,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.4"
-source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd#0dbf5fe0d40a2b48db2f88c0e1b2cb9d9746a12b"
+source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd#d5651aba1a4bf18d5350e4104aab5c9feca40fb3"
 dependencies = [
  "fhe-math",
  "fhe-traits",
@@ -301,7 +301,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.4"
-source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd#0dbf5fe0d40a2b48db2f88c0e1b2cb9d9746a12b"
+source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd#d5651aba1a4bf18d5350e4104aab5c9feca40fb3"
 dependencies = [
  "crypto-bigint",
  "fhe-traits",
@@ -324,7 +324,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.4"
-source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd#0dbf5fe0d40a2b48db2f88c0e1b2cb9d9746a12b"
+source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd#d5651aba1a4bf18d5350e4104aab5c9feca40fb3"
 dependencies = [
  "rand",
 ]
@@ -332,7 +332,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.4"
-source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd#0dbf5fe0d40a2b48db2f88c0e1b2cb9d9746a12b"
+source = "git+https://github.com/Janmajayamall/fhe.rs.git?branch=simd#d5651aba1a4bf18d5350e4104aab5c9feca40fb3"
 dependencies = [
  "itertools",
  "num-bigint-dig",
@@ -700,7 +700,7 @@ dependencies = [
 [[package]]
 name = "omr"
 version = "0.1.0"
-source = "git+https://github.com/Janmajayamall/ObliviousMessageRetrieval.git?branch=aztec#480ed83b8550f683a6fab2c0418961bf6994e7c9"
+source = "git+https://github.com/Janmajayamall/ObliviousMessageRetrieval.git?branch=aztec#2d03d73c7de0d9aee6fb8777c4da878346be3874"
 dependencies = [
  "bincode",
  "byteorder",
@@ -712,6 +712,7 @@ dependencies = [
  "itertools",
  "ndarray",
  "protobuf",
+ "quote",
  "rand",
  "rand_chacha",
  "rayon",
