@@ -17,9 +17,9 @@ use omr::{
     client::{construct_lhs, construct_rhs, gen_pvw_sk_cts, pv_decompress},
     pvw::{PvwCiphertext, PvwParameters, PvwPublicKey, PvwSecretKey},
     utils::{
-        assign_buckets, deserialize_detection_key, gen_detection_key, gen_rlk_keys_levelled,
-        gen_rot_keys_inner_product, gen_rot_keys_pv_selector, serialize_detection_key,
-        solve_equations,
+        assign_buckets, deserialize_detection_key, deserialize_digest1, deserialize_digest2,
+        gen_detection_key, gen_rlk_keys_levelled, gen_rot_keys_inner_product,
+        gen_rot_keys_pv_selector, gen_srlc_params, serialize_detection_key, solve_equations,
     },
     DEGREE, GAMMA, K, M, MODULI_OMR, MODULI_OMR_PT, M_ROW_SPAN, SET_SIZE, VARIANCE,
 };
@@ -121,7 +121,11 @@ pub fn generate_detection_key_pvw_sk_cts(bfv_sk: Vec<u8>, pvw_sk_bytes: &[u8]) -
     let pvw_sk = PvwSecretKey::from_bytes(pvw_sk_bytes, &pvw_par);
 
     let cts = gen_pvw_sk_cts(&bfv_par, &pvw_par, &bfv_sk, &pvw_sk, &mut rng);
-    let serialised_dkey = cts.iter().flat_map(|c| c.to_bytes()).collect();
+
+    let mut serialised_dkey = vec![];
+
+    cts.iter()
+        .for_each(|c| serialised_dkey.extend_from_slice(&c.to_bytes()));
 
     serialised_dkey
 }
@@ -176,70 +180,69 @@ pub fn generate_detection_key_rlks(bfv_sk: Vec<u8>) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
-pub fn decrypt_digest1(sk: Vec<u8>, digest: Vec<u8>) -> u64 {
+pub fn decrypt_digest1(sk: Vec<u8>, digest: Vec<u8>) -> Vec<u64> {
     let par = get_bfv_params();
     let sk: Vec<i64> = bincode::deserialize(&sk).unwrap();
     let sk = SecretKey::new(sk, &par);
 
-    let values = digest
-        .chunks(CT_BYTES)
-        .into_iter()
-        .flat_map(|ct_bytes| {
-            let ct = Ciphertext::from_bytes(ct_bytes, &par).unwrap();
-            let pt = sk.try_decrypt(&ct).unwrap();
-            Vec::<u64>::try_decode(&pt, Encoding::simd()).unwrap()
-        })
-        .collect::<Vec<u64>>();
+    let p_ct = Ciphertext::from_bytes(&digest, &par).unwrap();
+    let pt = sk.try_decrypt(&p_ct).unwrap();
+    let pt = Vec::<u64>::try_decode(&pt, Encoding::simd()).unwrap();
 
-    let pv = pv_decompress(
-        &values[..par.degree()],
-        (64 - (par.plaintext().leading_zeros() - 1)) as usize,
-    );
-
-    pv.iter().sum::<u64>()
+    // pertinent vector with 1 at index that is pertinent otherwise 0.
+    pv_decompress(&pt, 16)
 }
 
 #[wasm_bindgen]
-pub fn decrypt_digest2(sk: Vec<u8>, digest: Vec<u8>) -> Vec<u64> {
+pub fn decrypt_digest2(sk: Vec<u8>, pv: Vec<u64>, digest: Vec<u8>, max_txs: usize) -> Vec<u8> {
     let par = get_bfv_params();
     let sk: Vec<i64> = bincode::deserialize(&sk).unwrap();
     let sk = SecretKey::new(sk, &par);
-    let seed = vec![0u8];
 
+    // deserialize digest
+    let digest = deserialize_digest2(&digest, &par);
+
+    // values for rhs
     let values = digest
-        .chunks(CT_BYTES)
-        .into_iter()
-        .flat_map(|ct_bytes| {
-            let ct = Ciphertext::from_bytes(ct_bytes, &par).unwrap();
-            let pt = sk.try_decrypt(&ct).unwrap();
+        .cts
+        .iter()
+        .flat_map(|ct| {
+            let pt = sk.try_decrypt(ct).unwrap();
             Vec::<u64>::try_decode(&pt, Encoding::simd()).unwrap()
         })
         .collect::<Vec<u64>>();
 
-    let pv = pv_decompress(
-        &values[..par.degree()],
-        (64 - (par.plaintext().leading_zeros() - 1)) as usize,
-    );
+    // srlc params
+    let (k, m, gamma) = gen_srlc_params(max_txs);
+    let set_size = pv.len();
 
     // seed the rng
     let mut s: <ChaChaRng as SeedableRng>::Seed = Default::default();
-    s.copy_from_slice(&seed);
+    s.copy_from_slice(&digest.seed);
     let mut rng = ChaChaRng::from_seed(s);
     let (assigned_buckets, assigned_weights) =
-        assign_buckets(M, GAMMA, MODULI_OMR_PT[0], SET_SIZE, &mut rng);
+        assign_buckets(m, gamma, MODULI_OMR_PT[0], set_size, &mut rng);
 
     let lhs = construct_lhs(
         &pv,
         assigned_buckets,
         assigned_weights,
-        M,
-        K,
-        GAMMA,
-        SET_SIZE,
+        m,
+        k,
+        gamma,
+        set_size,
     );
-    let rhs = construct_rhs(&values[par.degree()..], M, M_ROW_SPAN, MODULI_OMR_PT[0]);
-    solve_equations(lhs, rhs, MODULI_OMR_PT[0])
-        .into_iter()
+    let rhs = construct_rhs(&values, m, 256, MODULI_OMR_PT[0]);
+    let solutions = solve_equations(lhs, rhs, MODULI_OMR_PT[0]);
+    solutions
+        .iter()
+        .flat_map(|sol| {
+            sol.iter().map(|v| {
+                let v_hi = (v >> 8);
+                let v_lo = v - (v << 8);
+                [v_lo as u8, v_hi as u8]
+            })
+        })
         .flatten()
         .collect()
 }
@@ -322,5 +325,11 @@ mod tests {
         let ct = PvwCiphertext::from_bytes(&clue, &params).unwrap();
         let pt = sk.decrypt_shifted(ct);
         assert_eq!(pt, vec![0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn trial() {
+        let par = get_bfv_params();
+        dbg!(64 - (par.plaintext().leading_zeros()));
     }
 }
