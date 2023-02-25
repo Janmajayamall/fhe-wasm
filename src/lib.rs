@@ -1,12 +1,8 @@
 use fhe::bfv::{
-    BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, EvaluationKey, EvaluationKeyBuilder,
-    GaloisKey, Plaintext, SecretKey,
+    BfvParameters, BfvParametersBuilder, Encoding, EvaluationKeyBuilder, GaloisKey, Plaintext,
+    SecretKey,
 };
-use fhe_math::{
-    rns::{RnsContext, RnsScaler, ScalingFactor},
-    rq::Context,
-    zq::{ntt::NttOperator, Modulus},
-};
+use fhe_math::rns::{RnsContext, RnsScaler, ScalingFactor};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter, Serialize,
 };
@@ -23,7 +19,7 @@ use omr::{
     },
     DEGREE, GAMMA, K, M, MODULI_OMR, MODULI_OMR_PT, M_ROW_SPAN, SET_SIZE, VARIANCE,
 };
-use rand::{thread_rng, RngCore, SeedableRng};
+use rand::{distributions::Uniform, thread_rng, CryptoRng, Rng, RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
 use std::{collections::HashMap, fmt::format, io::Write, sync::Arc};
 use wasm_bindgen::prelude::*;
@@ -32,8 +28,6 @@ use wasm_bindgen::prelude::*;
 extern "C" {
     fn alert(s: &str);
 }
-
-const CT_BYTES: usize = 0;
 
 #[wasm_bindgen]
 pub fn init_panic_hook() {
@@ -89,25 +83,6 @@ pub fn gen_clue(serialised_pk: &[u8]) -> Vec<u8> {
     let ct = pk.encrypt(vec![0; par.ell].as_slice(), &mut rng);
     ct.to_bytes()
 }
-
-// #[wasm_bindgen]
-// pub fn generate_detection_key(bfv_sk_i64: Box<[i64]>, pvw_sk_bytes: &[u8]) -> Vec<u8> {
-//     let mut rng = thread_rng();
-
-//     let bfv_par = get_bfv_params();
-//     let bfv_sk = SecretKey::new(bfv_sk_i64.to_vec(), &bfv_par);
-
-//     let pvw_par = get_pvw_params();
-//     let pvw_sk = PvwSecretKey::from_bytes(pvw_sk_bytes, &pvw_par);
-
-//     let key = gen_detection_key(&bfv_par, &pvw_par, &bfv_sk, &pvw_sk, &mut rng);
-//     let serialised_dkey = serialize_detection_key(&key);
-//     // let key2 = deserialize_detection_key(&bfv_par, &serialised_dkey);
-
-//     // assert_eq!(&key, &key2);
-
-//     serialised_dkey
-// }
 
 #[wasm_bindgen]
 pub fn generate_detection_key_pvw_sk_cts(bfv_sk: Vec<u8>, pvw_sk_bytes: &[u8]) -> Vec<u8> {
@@ -180,21 +155,40 @@ pub fn generate_detection_key_rlks(bfv_sk: Vec<u8>) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
-pub fn decrypt_digest1(sk: Vec<u8>, digest: Vec<u8>) -> Vec<u64> {
+pub fn decrypt_digest1(sk: Vec<u8>, digest: Vec<u8>) -> Vec<usize> {
     let par = get_bfv_params();
     let sk: Vec<i64> = bincode::deserialize(&sk).unwrap();
     let sk = SecretKey::new(sk, &par);
 
-    let p_ct = Ciphertext::from_bytes(&digest, &par).unwrap();
-    let pt = sk.try_decrypt(&p_ct).unwrap();
-    let pt = Vec::<u64>::try_decode(&pt, Encoding::simd()).unwrap();
+    let digest = deserialize_digest1(&digest, &par);
+    let pv: Vec<u64> = digest
+        .cts
+        .iter()
+        .flat_map(|c| {
+            let pt = sk.try_decrypt(&c).unwrap();
+            Vec::<u64>::try_decode(&pt, Encoding::simd()).unwrap()
+        })
+        .collect();
 
-    // pertinent vector with 1 at index that is pertinent otherwise 0.
-    pv_decompress(&pt, 16)
+    let mut indices = vec![];
+    pv_decompress(&pv, 16)
+        .iter()
+        .enumerate()
+        .for_each(|(index, v)| {
+            if *v == 1 {
+                indices.push(index);
+            }
+        });
+    indices
 }
 
 #[wasm_bindgen]
-pub fn decrypt_digest2(sk: Vec<u8>, pv: Vec<u64>, digest: Vec<u8>, max_txs: usize) -> Vec<u8> {
+pub fn decrypt_digest2(
+    sk: Vec<u8>,
+    indices: Vec<usize>,
+    digest: Vec<u8>,
+    max_txs: usize,
+) -> Vec<u8> {
     let par = get_bfv_params();
     let sk: Vec<i64> = bincode::deserialize(&sk).unwrap();
     let sk = SecretKey::new(sk, &par);
@@ -213,8 +207,9 @@ pub fn decrypt_digest2(sk: Vec<u8>, pv: Vec<u64>, digest: Vec<u8>, max_txs: usiz
         .collect::<Vec<u64>>();
 
     // srlc params
+    let max_txs = (max_txs as f64 / 64.0).ceil() as usize * 64;
     let (k, m, gamma) = gen_srlc_params(max_txs);
-    let set_size = pv.len();
+    let set_size = indices.iter().max().unwrap() + 1;
 
     // seed the rng
     let mut s: <ChaChaRng as SeedableRng>::Seed = Default::default();
@@ -223,17 +218,18 @@ pub fn decrypt_digest2(sk: Vec<u8>, pv: Vec<u64>, digest: Vec<u8>, max_txs: usiz
     let (assigned_buckets, assigned_weights) =
         assign_buckets(m, gamma, MODULI_OMR_PT[0], set_size, &mut rng);
 
-    let lhs = construct_lhs(
-        &pv,
-        assigned_buckets,
-        assigned_weights,
-        m,
-        k,
-        gamma,
-        set_size,
-    );
+    let mut lhs = vec![vec![0u64; k]; m];
+    for i in 0..indices.len() {
+        let index = indices[i];
+        for j in 0..gamma {
+            let bucket = assigned_buckets[index][j];
+            let weight = assigned_weights[index][j];
+            lhs[bucket][i] = weight;
+        }
+    }
     let rhs = construct_rhs(&values, m, 256, MODULI_OMR_PT[0]);
     let solutions = solve_equations(lhs, rhs, MODULI_OMR_PT[0]);
+
     solutions
         .iter()
         .flat_map(|sol| {
@@ -325,11 +321,5 @@ mod tests {
         let ct = PvwCiphertext::from_bytes(&clue, &params).unwrap();
         let pt = sk.decrypt_shifted(ct);
         assert_eq!(pt, vec![0, 0, 0, 0]);
-    }
-
-    #[test]
-    fn trial() {
-        let par = get_bfv_params();
-        dbg!(64 - (par.plaintext().leading_zeros()));
     }
 }
