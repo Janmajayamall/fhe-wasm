@@ -701,7 +701,7 @@ dependencies = [
 [[package]]
 name = "omr"
 version = "0.1.0"
-source = "git+https://github.com/Janmajayamall/ObliviousMessageRetrieval.git?branch=aztec#6a1c730e256e2088ee5a032fbcbb0622a2173678"
+source = "git+https://github.com/Janmajayamall/ObliviousMessageRetrieval.git?branch=aztec#1d263dc8b82c9b7165e5ce049837aa78f6d93dfa"
 dependencies = [
  "bincode",
  "byteorder",
